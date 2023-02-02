@@ -35,13 +35,13 @@ private:
 	char* buffer;
 	HWAVEOUT hWaveOut = NULL;
 	WAVEFORMATEX wfx;
-	// WORD  wFormatTag			Waveform-audio format type
-	// WORD  nChannels			Number of channels in the waveform-audio data
+	// WORD  wFormatTag		Waveform-audio format type
+	// WORD  nChannels		Number of channels in the waveform-audio data
 	// DWORD nSamplesPerSec		Sample rate, in samples per second (hertz)
 	// DWORD nAvgBytesPerSec	Average data-transfer rate - for WAVE_FORMAT_PCM, should be equal to nSamplesPerSec
 	// WORD  nBlockAlign		Block alignment in bytes 
 	// WORD  wBitsPerSample		Bits per sample - for WAVE_FORMAT_PCM, should be equal to 8 or 16
-	// WORD  cbSize				Size, in bytes, of extra format information (ignored - 0)
+	// WORD  cbSize			Size, in bytes, of extra format information (ignored - 0)
 };
 // HERE WE CAN SET YOUR ALGORITHM (take a look at the first lines)
 inline char algorithm(int t)
@@ -55,7 +55,7 @@ void MakeNoise::playTrack(const int& time, const int& samplesPerSec, int loop)
 	buffer = new char[size];
 	// minimal instance
 	if (loop < 1) loop = 1;
-
+        // WAV header
 	wfx.wFormatTag = WAVE_FORMAT_PCM;
 	wfx.nChannels = 0x01;
 	wfx.nSamplesPerSec = samplesPerSec;
@@ -107,10 +107,10 @@ bool newThread()
 {	// thread and argument
 	std::cout << "Thread ID : " << std::this_thread::get_id() << std::endl;
 	std::thread t(&MakeNoise::playTrack,	// function
-		MakeNoise(),						// class
-		16383,								// sequence duration (byte multiple)
-		8000,								// samples per second
-		INT_MAX);							// loop number 
+		MakeNoise(),			// class
+		16383,				// sequence duration (byte multiple)
+		8000,				// samples per second
+		INT_MAX);			// loop number 
 
 	t.detach(); // may I should use Join instead?
 	return true;

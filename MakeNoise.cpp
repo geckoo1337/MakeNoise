@@ -19,118 +19,112 @@
 #include <windows.h>
 #include <mmsystem.h>
 #include <iostream>
-#include <future>
 #include <thread>
-#include <iostream>
-#include <conio.h> 
-// required library
-#pragma comment(lib, "winmm.lib")
+#include <conio.h>
+#include <cmath>
 
+#pragma comment(lib, "winmm.lib")
+// ============================================================
+// CORE CLASS
+// ============================================================
 class MakeNoise
 {
 public:
-	void playTrack(const int& time, const int& SamplesPerSec, int loop = 1);
+    void playTrack(const int& time, const int& SamplesPerSec, int loop = 1);
 
 private:
-	char* buffer;
-	HWAVEOUT hWaveOut = NULL;
-	WAVEFORMATEX wfx;
-	// WORD  wFormatTag		Waveform-audio format type
-	// WORD  nChannels		Number of channels in the waveform-audio data
-	// DWORD nSamplesPerSec		Sample rate, in samples per second (hertz)
-	// DWORD nAvgBytesPerSec	Average data-transfer rate - for WAVE_FORMAT_PCM, should be equal to nSamplesPerSec
-	// WORD  nBlockAlign		Block alignment in bytes 
-	// WORD  wBitsPerSample		Bits per sample - for WAVE_FORMAT_PCM, should be equal to 8 or 16
-	// WORD  cbSize			Size, in bytes, of extra format information (ignored - 0)
+    unsigned char* buffer = nullptr;
+    HWAVEOUT hWaveOut = NULL;
+    WAVEFORMATEX wfx;
 };
-// HERE WE CAN SET YOUR ALGORITHM (take a look at the first lines)
-inline char algorithm(int t)
+// ============================================================
+// HERE WE CAN SET YOUR ALGORITHM
+// ============================================================
+inline unsigned char algorithm(int t)
 {
-	return (t & t >> 8);
+    int v = (t & (t >> 8));
+    v = v & 255;
+    return static_cast<unsigned char>(v);
 }
-
+// ============================================================
+// AUDIO ENGINE
+// ============================================================
 void MakeNoise::playTrack(const int& time, const int& samplesPerSec, int loop)
-{	// allocate memory
-	size_t size = static_cast<size_t>((time * samplesPerSec) / 1000);
-	buffer = new char[size];
-	// minimal instance
-	if (loop < 1) loop = 1;
-        // WAV header
-	wfx.wFormatTag = WAVE_FORMAT_PCM;
-	wfx.nChannels = 0x01;
-	wfx.nSamplesPerSec = samplesPerSec;
-	wfx.nAvgBytesPerSec = samplesPerSec;
-	wfx.nBlockAlign = 0x01;
-	wfx.wBitsPerSample = 0x08;
-	wfx.cbSize = NULL;
-	// https://docs.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-waveoutopen
-	waveOutOpen(&hWaveOut, WAVE_MAPPER, &wfx, NULL, NULL, CALLBACK_NULL);
-	// fills our buffer with your algorithm for track
-	for (DWORD t = 0; t < size; t++)
-		buffer[t] = static_cast<char>(algorithm(t));
-	// header
-	WAVEHDR header = { buffer, (DWORD)size, NULL, NULL, WHDR_BEGINLOOP | WHDR_ENDLOOP, (DWORD)loop, NULL, NULL };
-	/*
-	MMRESULT waveOutPrepareHeader/waveOutWrite/waveOutUnprepareHeader(
-		HWAVEOUT  hwo,	// Handle to the waveform-audio output device
-		LPWAVEHDR pwh,	// Pointer to a WAVEHDR structure that identifies the data block to be prepared
-		UINT      cbwh	// Size, in bytes, of the WAVEHDR structure
-	);
-	*/
-	waveOutPrepareHeader(hWaveOut, &header, sizeof(WAVEHDR));
-	waveOutWrite(hWaveOut, &header, sizeof(WAVEHDR));
-	waveOutUnprepareHeader(hWaveOut, &header, sizeof(WAVEHDR)); // clean up
-	// The waveOutClose function closes the given waveform-audio output device
-	waveOutClose(hWaveOut);
-	/*
-	MMRESULT waveOutSetVolume(
-		HWAVEOUT hwo,		// Handle to the waveform-audio output device
-		DWORD    dwVolume	// set volume for speakers, 4 bits for each
-	);
-	*/
-	waveOutSetVolume(hWaveOut, 0x0FFF0FFF); // set volume
-	/*
-	MMRESULT waveOutSetPlaybackRate(
-		HWAVEOUT hwo,		// Handle to the waveform-audio output device
-		DWORD    dwRate		// New playback rate setting
-	);
-	*/
-	waveOutSetPlaybackRate(hWaveOut, 0x0000FFFF); // pitch
-	// sleep for a while - track is running
-	Sleep((time * loop));
-	// clean up
-	delete[] buffer;
-	std::cout << "The Thread Is Dead" << std::endl;
-}
+{
+    // allocate memory
+    size_t size = static_cast<size_t>((time * samplesPerSec) / 1000);
+    buffer = new unsigned char[size];
+    // minimal instance
+    if (loop < 1) loop = 1;
+    // =========================================================
+    // WAV header (FIX IMPORTANT)
+    // =========================================================
+    wfx.wFormatTag = WAVE_FORMAT_PCM;
+    wfx.nChannels = 1;
+    wfx.nSamplesPerSec = samplesPerSec;
+    wfx.nAvgBytesPerSec = samplesPerSec;
+    wfx.nBlockAlign = 1;
+    wfx.wBitsPerSample = 8;
+    wfx.cbSize = 0;
 
+    waveOutOpen(&hWaveOut, WAVE_MAPPER, &wfx, 0, 0, CALLBACK_NULL);
+    // fills our buffer with your algorithm for track
+    for (DWORD t = 0; t < size; t++)
+        buffer[t] = algorithm(t);
+    // =========================================================
+    // header
+    // =========================================================
+    WAVEHDR header{};
+    header.lpData = (LPSTR)buffer;
+    header.dwBufferLength = (DWORD)size;
+    header.dwFlags = 0;
+
+    waveOutPrepareHeader(hWaveOut, &header, sizeof(WAVEHDR));
+    waveOutWrite(hWaveOut, &header, sizeof(WAVEHDR));
+   
+    while (!(header.dwFlags & WHDR_DONE))
+        Sleep(1);
+
+    waveOutUnprepareHeader(hWaveOut, &header, sizeof(WAVEHDR));
+    waveOutClose(hWaveOut);
+
+    delete[] buffer;
+
+    std::cout << "The Thread Is Dead" << std::endl;
+}
+// ============================================================
+// THREAD WRAPPER (FIX SAFE USAGE)
+// ============================================================
 bool newThread()
-{	// thread and argument
-	std::cout << "Thread ID : " << std::this_thread::get_id() << std::endl;
-	std::thread t(&MakeNoise::playTrack,	// function
-		MakeNoise(),			// class
-		16383,				// sequence duration (byte multiple)
-		8000,				// samples per second
-		INT_MAX);			// loop number 
+{
+    std::cout << "Thread ID : " << std::this_thread::get_id() << std::endl;
 
-	t.detach(); // may I should use Join instead?
-	return true;
+    std::thread t([]()
+    {
+        MakeNoise m;
+        m.playTrack(16383, 8000, 1);
+    });
+
+    t.detach();
+    return true;
 }
-
+// ============================================================
+// MAIN
+// ============================================================
 int main()
 {
-	#define ESCAPE 27
-	std::cout << "Procedural Music using a single algorithm" << std::endl;
-	// start our thread
-	std::future<bool> bgThread = std::async(std::launch::async, newThread);
-	// wait escape key to close application
-	while (true)
-	{
-		int c = 0;
+    #define ESCAPE 27
+    std::cout << "Procedural Music using a single algorithm" << std::endl;
 
-		switch ((c = _getch()))
-		{
-		case ESCAPE:
-			return 0;
-		}
-	}
+    std::future<bool> bgThread = std::async(std::launch::async, newThread);
+
+    while (true)
+    {
+        if (_kbhit())
+        {
+            int c = _getch();
+            if (c == ESCAPE)
+                return 0;
+        }
+    }
 }
